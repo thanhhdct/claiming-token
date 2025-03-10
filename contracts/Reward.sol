@@ -4,6 +4,7 @@ pragma solidity ^0.8;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./MyToken.sol";
+import "hardhat/console.sol";
 
 contract Rewards is Ownable, MyToken {
     mapping(address => uint256) public rewards;
@@ -18,7 +19,12 @@ contract Rewards is Ownable, MyToken {
     }
 
     function getUSDTBalance(address account) public view returns (uint256) {
+        console.log("get balance of account %s with value %d", account, balanceOf(account));
         return balanceOf(account); // Directly checks MKI balance
+    }
+
+    function getReward() public view returns (uint256){
+        return rewards[msg.sender];
     }
 
     // Anyone can claim rewards
