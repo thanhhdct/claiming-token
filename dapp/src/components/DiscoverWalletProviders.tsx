@@ -3,9 +3,10 @@ import { ethers } from "ethers";
 import * as artifacts from "./../../../artifacts/contracts/Reward.sol/Rewards.json";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import image from "../assets/metamask.jpg";
 
 // Contract Details
-const CONTRACT_ADDRESS = "0xf5059a5D33d5853360D16C683c16e67980206f36"; // Replace with your contract's address
+const CONTRACT_ADDRESS = "0x610178dA211FEF7D417bC0e6FeD39F05609AD788"; // Replace with your contract's address
 const ABI = artifacts.abi;
 
 export const DiscoverWalletProviders = () => {
@@ -14,14 +15,13 @@ export const DiscoverWalletProviders = () => {
   const [claimerAddress, setClaimerAddress] = useState<string>("");
   const [claimAmount, setClaimAmount] = useState("");
   const [balance, setBalance] = useState<any>("");
+  const [rewardToken, setRewardToken] = useState<any>("");
   const [provider, setProvider] = useState<ethers.BrowserProvider | null>(null);
-
+  const [isOwner, setIsOwner] = useState(false);
   // Connect Wallet
   const connectWallet = async () => {
     try {
       if (!window.ethereum) throw new Error("No Ethereum provider found");
-
-      console.log("🚀 Connecting to MetaMask...");
       const web3Provider = new ethers.BrowserProvider(window.ethereum);
       setProvider(web3Provider);
 
@@ -31,23 +31,35 @@ export const DiscoverWalletProviders = () => {
 
       setUserAccount(accounts[0]);
       setSelectedWallet(window.ethereum);
-      // setBalance(ethers.formatUnits(0, 18)); // Convert from Wei to token units
     } catch (error) {
       console.error("Error connecting wallet:", error);
     }
   };
 
-  // Lắng nghe sự kiện đổi tài khoản MetaMask
+  // Fetch the owner address from the contract
+  const fetchOwner = async () => {
+    try {
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const owner = await contract.owner();
+      setIsOwner(owner.toLowerCase() === userAccount.toLowerCase());
+    } catch (error) {
+      console.error("Error fetching owner address:", error);
+    }
+  };
+
   useEffect(() => {
     if (!window.ethereum) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
-      console.log("🔄 Tài khoản đã thay đổi:", accounts);
+      console.log("Account has changed:", accounts);
       if (accounts.length > 0) {
         setUserAccount(accounts[0]); // Cập nhật tài khoản mới
         fetchBalance();
+        const web3Provider = new ethers.BrowserProvider(window.ethereum);
+        setProvider(web3Provider);
       } else {
-        setUserAccount(""); // Reset nếu không có tài khoản
+        setUserAccount("");
         setBalance("0");
       }
     };
@@ -59,21 +71,38 @@ export const DiscoverWalletProviders = () => {
     };
   }, []);
 
-  // Fetch USDT Balance from Contract
+  useEffect(() => {
+    if (provider) {
+      fetchReward();
+      fetchOwner();
+    }
+  }, [provider, userAccount]);
+
   const fetchBalance = async () => {
     try {
-      console.log("run to fetchBalance..........");
-      if (!provider) throw new Error("No provider found");
-      if (!userAccount) throw new Error("No wallet connected");
-      console.log("🚀 ~ fetchBalance ~ userAccount:", userAccount);
-
       console.log("🔄 Fetching balance...");
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
-      const balanceWei = await contract.getUSDTBalance(userAccount);
+      if (!provider) {
+        setBalance("");
+      } else {
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+        const balanceWei = await contract.getUSDTBalance(userAccount);
 
-      setBalance(ethers.formatUnits(balanceWei, 18)); // Convert from Wei to token units
+        setBalance(ethers.formatUnits(balanceWei, 18)); // Convert from Wei to token units
+      }
     } catch (error) {
       console.error("Error fetching balance:", error);
+    }
+  };
+
+  const fetchReward = async () => {
+    try {
+      console.log("run to fetch reward");
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+      const reward = await contract.getReward();
+      setRewardToken(ethers.formatUnits(reward, 18));
+    } catch (error) {
+      console.error("Error fetching rewards:", error);
     }
   };
 
@@ -86,6 +115,22 @@ export const DiscoverWalletProviders = () => {
       const transaction = await contract.setReward(claimerAddress, claimAmount);
       await transaction.wait();
       toast.success("Set reward successfully!");
+      setClaimAmount("");
+      setClaimerAddress("");
+    } catch (error) {
+      console.error("Error setReward:", error);
+    }
+  };
+
+  const claimReward = async () => {
+    try {
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+      const transaction = await contract.claimReward();
+      await transaction.wait();
+      toast.success("Claim reward successfully!");
+      fetchReward();
     } catch (error) {
       console.error("Error setReward:", error);
     }
@@ -97,12 +142,12 @@ export const DiscoverWalletProviders = () => {
       <div>
         {selectedWallet ? (
           <button onClick={connectWallet}>
-            <img src={"logo"} alt="Wallet" />
-            <div>Switch Wallet</div>
+            <img src={image} alt="Wallet" />
+            <div>MetaMask</div>
           </button>
         ) : (
           <button onClick={connectWallet}>
-            <img src="/wallet-icon.png" alt="Wallet" />
+            <img src={image} alt="Wallet" />
             <div>Connect Wallet</div>
           </button>
         )}
@@ -114,23 +159,47 @@ export const DiscoverWalletProviders = () => {
         <div>
           <p>Account: {userAccount}</p>
           <button onClick={fetchBalance}>Get Balance</button>
-          <p>TOKEN Balance: {balance} TOKEN</p>
+          <p>TOKEN Balance: {balance}</p>
         </div>
       )}
-      <hr></hr>
       <hr></hr>
       {userAccount && (
         <div>
           <div>
-            <p>user address: </p>
-            <input onChange={(e) => setClaimerAddress(e.target.value)}></input>
+            <p>My rewards: {rewardToken} TOKEN</p>
           </div>
           <div>
+            <button
+              onClick={claimReward}
+              disabled={parseFloat(rewardToken) <= 0}
+            >
+              Claim reward
+            </button>
+          </div>
+        </div>
+      )}
+      <hr></hr>
+      {userAccount && isOwner && (
+        <div>
+          <div>
+            <p>user address: </p>
+            <p>
+              <input
+                onChange={(e) => setClaimerAddress(e.target.value)}
+                value={claimerAddress}
+              ></input>
+            </p>
+          </div>
+
+          <div>
             <p>amount: </p>
-            <input
-              type="number"
-              onChange={(e) => setClaimAmount(e.target.value)}
-            ></input>
+            <p>
+              <input
+                type="number"
+                onChange={(e) => setClaimAmount(e.target.value)}
+                value={claimAmount}
+              ></input>
+            </p>
           </div>
           <button onClick={setReward}>Set Reward</button>
         </div>

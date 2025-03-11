@@ -10,20 +10,24 @@ contract Rewards is Ownable, MyToken {
     mapping(address => uint256) public rewards;
 
     constructor() Ownable(msg.sender) {
-        _mint(address(this), 10000000 * (10 ** uint256(decimals()))); 
+        _mint(address(this), 10000000 * (10 ** uint256(decimals())));
     }
 
     // Only owner can set rewards
     function setReward(address account, uint256 amount) public onlyOwner {
-        rewards[account] = amount;
+        rewards[account] = amount * (10 ** uint256(decimals()));
     }
 
     function getUSDTBalance(address account) public view returns (uint256) {
-        console.log("get balance of account %s with value %d", account, balanceOf(account));
+        console.log(
+            "get balance of account %s with value %d",
+            account,
+            balanceOf(account)
+        );
         return balanceOf(account); // Directly checks MKI balance
     }
 
-    function getReward() public view returns (uint256){
+    function getReward() public view returns (uint256) {
         return rewards[msg.sender];
     }
 
@@ -34,7 +38,10 @@ contract Rewards is Ownable, MyToken {
 
         rewards[msg.sender] = 0;
 
-        require(balanceOf(address(this)) >= reward, "Not enough rewards available");
+        require(
+            balanceOf(address(this)) >= reward,
+            "Not enough rewards available"
+        );
         _transfer(address(this), msg.sender, reward); // Transfer from contract balance
     }
 }
