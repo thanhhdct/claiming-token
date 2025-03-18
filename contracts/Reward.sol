@@ -9,6 +9,8 @@ import "hardhat/console.sol";
 contract Rewards is Ownable, MyToken {
     mapping(address => uint256) public rewards;
 
+    event SetReward(address sender, uint setAmount, address toAccount);
+
     constructor() Ownable(msg.sender) {
         _mint(address(this), 10000000 * (10 ** uint256(decimals())));
     }
@@ -16,6 +18,7 @@ contract Rewards is Ownable, MyToken {
     // Only owner can set rewards
     function setReward(address account, uint256 amount) public onlyOwner {
         rewards[account] = amount * (10 ** uint256(decimals()));
+        emit SetReward(msg.sender, amount, account);
     }
 
     function getUSDTBalance(address account) public view returns (uint256) {
